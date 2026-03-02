@@ -274,6 +274,17 @@ class FeishuAdapter(ChannelAdapter):
             if self._bot_open_id and sender_id == self._bot_open_id:
                 return
 
+            # In group chats, only respond when the bot is @mentioned
+            mentions = getattr(msg, "mentions", None) or []
+            bot_mention_key = None
+            if chat_type == "group" and self._bot_open_id:
+                for m in mentions:
+                    if m.id and m.id.open_id == self._bot_open_id:
+                        bot_mention_key = m.key  # e.g. "@_user_1"
+                        break
+                if not bot_mention_key:
+                    return
+
             msg_type = msg.message_type
             content = ""
             media_paths: list[str] = []
@@ -302,6 +313,10 @@ class FeishuAdapter(ChannelAdapter):
             else:
                 # Unsupported message type — ignore
                 return
+
+            # Strip the bot @mention placeholder from content (e.g. "@_user_1")
+            if bot_mention_key and content:
+                content = content.replace(bot_mention_key, "").strip()
 
             if not content and not media_paths:
                 return

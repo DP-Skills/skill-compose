@@ -4,7 +4,6 @@ import base64
 import json
 import logging
 import time
-from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Optional, List, Tuple
 
@@ -14,11 +13,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent import SkillsAgent, EventStream, write_steering_message, poll_steering_messages, cleanup_steering_dir
+from app.agent import EventStream, write_steering_message, poll_steering_messages, cleanup_steering_dir
 from app.api.v1.display_builder import DisplayMessageBuilder
 from app.api.v1.sessions import load_or_create_session, save_session_messages, save_session_checkpoint, save_session_checkpoint_sync, pre_compress_if_needed, CHAT_SENTINEL_AGENT_ID
 from app.db.database import get_db, AsyncSessionLocal, SyncSessionLocal
 from app.db.models import AgentTraceDB, AgentPresetDB
+from app.services.agent_runner import AgentConfig, config_from_preset, create_agent, build_completed_trace, build_initial_trace
 
 logger = logging.getLogger("skills_api")
 
@@ -145,7 +145,7 @@ async def steer_agent(trace_id: str, body: SteerRequest, db: AsyncSession = Depe
     return {"status": "injected", "trace_id": trace_id}
 
 
-async def _resolve_agent_config(request: AgentRequest, db: AsyncSession) -> dict:
+async def _resolve_agent_config(request: AgentRequest, db: AsyncSession) -> AgentConfig:
     """Resolve effective agent config. If agent_id is set, load preset and use its config."""
     from sqlalchemy import select
 
@@ -161,18 +161,18 @@ async def _resolve_agent_config(request: AgentRequest, db: AsyncSession) -> dict
                     detail=f"Executor '{executor_name}' is offline. Cannot run agent."
                 )
 
-        return {
-            "skills": request.skills,
-            "allowed_tools": request.allowed_tools,
-            "max_turns": request.max_turns,
-            "equipped_mcp_servers": request.equipped_mcp_servers,
-            "system_prompt": request.system_prompt,
-            "model_provider": request.model_provider,
-            "model_name": request.model_name,
-            "agent_id": None,
-            "executor_name": executor_name,
-            "is_meta_agent": False,
-        }
+        return AgentConfig(
+            skills=request.skills,
+            allowed_tools=request.allowed_tools,
+            max_turns=request.max_turns,
+            equipped_mcp_servers=request.equipped_mcp_servers,
+            system_prompt=request.system_prompt,
+            model_provider=request.model_provider,
+            model_name=request.model_name,
+            agent_id=None,
+            executor_name=executor_name,
+            is_meta_agent=False,
+        )
 
     result = await db.execute(
         select(AgentPresetDB).where(AgentPresetDB.id == request.agent_id)
@@ -192,18 +192,11 @@ async def _resolve_agent_config(request: AgentRequest, db: AsyncSession) -> dict
                 detail=f"Executor '{executor_name}' is offline. Cannot run agent."
             )
 
-    return {
-        "skills": preset.skill_ids,
-        "allowed_tools": preset.builtin_tools,
-        "max_turns": preset.max_turns,
-        "equipped_mcp_servers": preset.mcp_servers,
-        "system_prompt": preset.system_prompt,
-        "model_provider": preset.model_provider or request.model_provider,
-        "model_name": preset.model_name or request.model_name,
-        "agent_id": preset.id,
-        "executor_name": executor_name,
-        "is_meta_agent": preset.is_system,
-    }
+    cfg = config_from_preset(preset)
+    # Override model from request if preset doesn't specify
+    cfg.model_provider = preset.model_provider or request.model_provider
+    cfg.model_name = preset.model_name or request.model_name
+    return cfg
 
 
 def _build_request_with_files(
@@ -284,7 +277,7 @@ IMPORTANT: Use the absolute file paths shown above when reading or processing fi
     return actual_request, image_contents
 
 
-def _validate_api_key(config: dict):
+def _validate_api_key(config: AgentConfig):
     """Validate that the API key for the selected provider is configured.
 
     Raises HTTPException(400) if the key is missing or empty.
@@ -293,7 +286,7 @@ def _validate_api_key(config: dict):
     from app.llm.provider import PROVIDER_API_KEY_MAP
 
     settings_obj = get_settings()
-    provider = config.get("model_provider") or settings_obj.default_model_provider
+    provider = config.model_provider or settings_obj.default_model_provider
     env_var = PROVIDER_API_KEY_MAP.get(provider, f"{provider.upper()}_API_KEY")
     key_value = read_env_value(env_var)
     if not key_value or not key_value.strip():
@@ -302,23 +295,6 @@ def _validate_api_key(config: dict):
             detail=f"API key for provider '{provider}' is not configured. "
                    f"Please set {env_var} in Settings > Environment.",
         )
-
-
-def _create_agent(config: dict, workspace_id: Optional[str] = None) -> SkillsAgent:
-    """Create a SkillsAgent from resolved config."""
-    return SkillsAgent(
-        model=config.get("model_name"),
-        model_provider=config.get("model_provider"),
-        max_turns=config["max_turns"],
-        verbose=True,
-        allowed_skills=config["skills"],
-        allowed_tools=config["allowed_tools"],
-        equipped_mcp_servers=config["equipped_mcp_servers"],
-        custom_system_prompt=config["system_prompt"],
-        executor_name=config.get("executor_name"),
-        workspace_id=workspace_id,
-        is_meta_agent=config.get("is_meta_agent", False),
-    )
 
 
 @router.post("/run", response_model=AgentResponse)
@@ -341,19 +317,19 @@ async def run_agent(request: AgentRequest, db: AsyncSession = Depends(get_db)):
     start_time = time.time()
 
     # Load session history from DB (dual-store)
-    agent_id = config.get("agent_id") or CHAT_SENTINEL_AGENT_ID
-    session_data = await load_or_create_session(request.session_id, agent_id)
+    agent_id_for_session = config.agent_id or CHAT_SENTINEL_AGENT_ID
+    session_data = await load_or_create_session(request.session_id, agent_id_for_session)
     session_id = session_data.session_id
     history = session_data.agent_context  # Use agent_context for the agent
 
     # Create agent with session_id as workspace_id for deterministic mapping
-    agent = _create_agent(config, workspace_id=session_id)
+    agent = create_agent(config, workspace_id=session_id)
 
     try:
         # Pre-compress if context exceeds threshold
         from app.config import settings as app_settings_run
-        effective_provider = config.get("model_provider") or app_settings_run.default_model_provider
-        effective_model = config.get("model_name") or app_settings_run.default_model_name
+        effective_provider = config.model_provider or app_settings_run.default_model_provider
+        effective_model = config.model_name or app_settings_run.default_model_name
         if history:
             history = await pre_compress_if_needed(history, effective_provider, effective_model)
 
@@ -361,8 +337,8 @@ async def run_agent(request: AgentRequest, db: AsyncSession = Depends(get_db)):
         actual_request, image_contents = _build_request_with_files(
             request.request,
             request.uploaded_files,
-            model_provider=config.get("model_provider"),
-            model_name=config.get("model_name"),
+            model_provider=config.model_provider,
+            model_name=config.model_name,
         )
 
         result = await agent.run(actual_request, conversation_history=history, image_contents=image_contents)
@@ -370,22 +346,12 @@ async def run_agent(request: AgentRequest, db: AsyncSession = Depends(get_db)):
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Save trace to database
-        trace = AgentTraceDB(
-            request=request.request,
-            skills_used=result.skills_used or [],
-            model_provider=agent.model_provider,
-            model=agent.model,
-            status="completed" if result.success else "failed",
-            success=result.success,
-            answer=result.answer,
-            error=result.error,
-            total_turns=result.total_turns,
-            total_input_tokens=result.total_input_tokens,
-            total_output_tokens=result.total_output_tokens,
-            steps=[asdict(step) for step in result.steps],
-            llm_calls=[asdict(call) for call in result.llm_calls],
+        trace = build_completed_trace(
+            request_text=request.request,
+            result=result,
+            agent=agent,
             duration_ms=duration_ms,
-            executor_name=config.get("executor_name"),
+            executor_name=config.executor_name,
             session_id=session_id,
         )
         db.add(trace)
@@ -450,12 +416,12 @@ async def run_agent_stream(request: AgentRequest, db: AsyncSession = Depends(get
     actual_request, image_contents = _build_request_with_files(
         request.request,
         request.uploaded_files,
-        model_provider=config.get("model_provider"),
-        model_name=config.get("model_name"),
+        model_provider=config.model_provider,
+        model_name=config.model_name,
     )
 
     # Load session history from DB (dual-store)
-    agent_id_for_session = config.get("agent_id") or CHAT_SENTINEL_AGENT_ID
+    agent_id_for_session = config.agent_id or CHAT_SENTINEL_AGENT_ID
     session_data = await load_or_create_session(request.session_id, agent_id_for_session)
     session_id = session_data.session_id
     history = session_data.agent_context  # Use agent_context for the agent
@@ -463,8 +429,8 @@ async def run_agent_stream(request: AgentRequest, db: AsyncSession = Depends(get
 
     # Pre-compress if context exceeds threshold
     from app.config import settings as app_settings_pre
-    pre_provider = config.get("model_provider") or app_settings_pre.default_model_provider
-    pre_model = config.get("model_name") or app_settings_pre.default_model_name
+    pre_provider = config.model_provider or app_settings_pre.default_model_provider
+    pre_model = config.model_name or app_settings_pre.default_model_name
     if history:
         history = await pre_compress_if_needed(history, pre_provider, pre_model)
 
@@ -474,25 +440,14 @@ async def run_agent_stream(request: AgentRequest, db: AsyncSession = Depends(get
         # Create trace record at the start (with running status)
         trace_id = None
         from app.config import settings as app_settings
-        effective_provider = config.get("model_provider") or app_settings.default_model_provider
-        effective_model = config.get("model_name") or app_settings.default_model_name
+        effective_provider = config.model_provider or app_settings.default_model_provider
+        effective_model = config.model_name or app_settings.default_model_name
         async with AsyncSessionLocal() as trace_db:
-            trace = AgentTraceDB(
-                request=request.request,
-                skills_used=[],  # Will be updated on completion with actually used skills
+            trace = build_initial_trace(
+                request_text=request.request,
                 model_provider=effective_provider,
-                model=effective_model,
-                status="running",  # Will be updated on completion
-                success=False,  # Will be updated on completion
-                answer="",
-                error=None,
-                total_turns=0,
-                total_input_tokens=0,
-                total_output_tokens=0,
-                steps=[],
-                llm_calls=[],
-                duration_ms=0,
-                executor_name=config.get("executor_name"),
+                model_name=effective_model,
+                executor_name=config.executor_name,
                 session_id=session_id,
             )
             trace_db.add(trace)
@@ -503,19 +458,8 @@ async def run_agent_stream(request: AgentRequest, db: AsyncSession = Depends(get
         yield f"data: {json.dumps({'event_type': 'run_started', 'turn': 0, 'trace_id': trace_id, 'session_id': session_id})}\n\n"
 
         # Create agent, event stream, and cancellation event
-        agent = SkillsAgent(
-            model=config.get("model_name"),
-            model_provider=config.get("model_provider"),
-            max_turns=config["max_turns"],
-            verbose=False,
-            allowed_skills=config["skills"],
-            allowed_tools=config["allowed_tools"],
-            equipped_mcp_servers=config["equipped_mcp_servers"],
-            custom_system_prompt=config["system_prompt"],
-            executor_name=config.get("executor_name"),
-            workspace_id=session_id,
-            is_meta_agent=config.get("is_meta_agent", False),
-        )
+        config.verbose = False
+        agent = create_agent(config, workspace_id=session_id)
 
         event_stream = EventStream()
         cancel_event = asyncio.Event()

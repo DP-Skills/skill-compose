@@ -531,7 +531,7 @@ class TestStreamRetrySSE:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_sse_with_text_deltas(self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client):
         """SSE stream carries text_delta events from normal streaming."""
         mock_instance = _make_mock_agent_with_events([
@@ -575,7 +575,7 @@ class TestStreamRetrySSE:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_sse_with_error_after_deltas(self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client):
         """SSE stream: text_deltas followed by error complete (simulates failed retry)."""
         mock_instance = _make_mock_agent_with_events([
@@ -620,7 +620,7 @@ class TestStreamRetrySSE:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_sse_text_delta_buffer_flushed_on_tool_call(
         self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client
     ):

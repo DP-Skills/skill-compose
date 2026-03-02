@@ -8,7 +8,6 @@ import asyncio
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -195,12 +194,13 @@ class TaskScheduler:
         from app.db.database import SyncSessionLocal
         from app.db.models import (
             ScheduledTaskDB, TaskRunLogDB, AgentPresetDB,
-            AgentTraceDB, PublishedSessionDB, generate_uuid,
+            PublishedSessionDB, generate_uuid,
         )
-        from app.agent import SkillsAgent
+        from app.services.agent_runner import config_from_preset, create_agent, build_completed_trace
 
         start_time = time.time()
         session = SyncSessionLocal()
+        agent = None
 
         try:
             # Load task and agent preset
@@ -222,56 +222,54 @@ class TaskScheduler:
                 if pub_session and pub_session.agent_context:
                     conversation_history = pub_session.agent_context
 
-            # Create agent
-            agent = SkillsAgent(
-                custom_system_prompt=preset.system_prompt,
-                allowed_skills=preset.skill_ids,
-                equipped_mcp_servers=preset.mcp_servers,
-                allowed_tools=preset.builtin_tools,
-                max_turns=preset.max_turns or 60,
-                model_provider=preset.model_provider,
-                model=preset.model_name,
-                executor_name=preset.executor_name,
-            )
+            # Create agent via shared service
+            config = config_from_preset(preset)
+            agent = create_agent(config, workspace_id=task.session_id)
 
-            # Run agent
+            # Run agent (single event loop for all async operations)
             loop = asyncio.new_event_loop()
             try:
+                # Pre-compress if context exceeds threshold
+                if conversation_history:
+                    from app.api.v1.sessions import pre_compress_if_needed
+                    conversation_history = loop.run_until_complete(
+                        pre_compress_if_needed(
+                            conversation_history,
+                            agent.model_provider,
+                            agent.model,
+                        )
+                    )
+
                 result = loop.run_until_complete(
                     agent.run(task.prompt, conversation_history=conversation_history)
                 )
+
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                # Save trace via shared service
+                trace = build_completed_trace(
+                    request_text=task.prompt,
+                    result=result,
+                    agent=agent,
+                    duration_ms=duration_ms,
+                    executor_name=config.executor_name,
+                    session_id=task.session_id,
+                )
+                session.add(trace)
+
+                # Update session via save_session_messages (dual-store: agent_context + display)
+                if task.context_mode == "session" and task.session_id and result.final_messages:
+                    from app.api.v1.sessions import save_session_messages
+                    loop.run_until_complete(
+                        save_session_messages(
+                            task.session_id,
+                            result.answer,
+                            task.prompt,
+                            final_messages=result.final_messages,
+                        )
+                    )
             finally:
                 loop.close()
-
-            duration_ms = int((time.time() - start_time) * 1000)
-
-            # Save trace
-            trace = AgentTraceDB(
-                id=generate_uuid(),
-                request=task.prompt,
-                skills_used=list(result.skills_used) if result.skills_used else [],
-                model_provider=preset.model_provider or "kimi",
-                model=agent.model or preset.model_name or "kimi-k2.5",
-                status="completed" if result.success else "failed",
-                success=result.success,
-                answer=result.answer,
-                error=result.error,
-                total_turns=result.total_turns,
-                total_input_tokens=result.total_input_tokens,
-                total_output_tokens=result.total_output_tokens,
-                steps=[asdict(s) for s in result.steps],
-                llm_calls=[asdict(c) for c in result.llm_calls],
-                duration_ms=duration_ms,
-                session_id=task.session_id,
-            )
-            session.add(trace)
-
-            # Update session context if session mode
-            if task.context_mode == "session" and task.session_id and result.final_messages:
-                pub_session = session.get(PublishedSessionDB, task.session_id)
-                if pub_session:
-                    pub_session.agent_context = result.final_messages
-                    pub_session.updated_at = datetime.utcnow()
 
             # Update run log
             self._update_run_log(
@@ -307,6 +305,8 @@ class TaskScheduler:
                 duration_ms=duration_ms,
             )
         finally:
+            if agent:
+                agent.cleanup()
             session.close()
 
     def _update_run_log(

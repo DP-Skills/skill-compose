@@ -1684,7 +1684,7 @@ class TestIncrementalDisplaySaveE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_01_turn_complete_saves_display(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,
@@ -1799,7 +1799,7 @@ class TestIncrementalDisplaySaveE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_02_turn_complete_appends_to_existing_display(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,

@@ -14,6 +14,7 @@ import hashlib
 import logging
 import mimetypes
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from collections import namedtuple
@@ -306,7 +307,7 @@ class ChannelManager:
         from app.db.database import AsyncSessionLocal
         from app.db.models import (
             ChannelBindingDB, ChannelMessageDB, AgentPresetDB,
-            PublishedSessionDB, AgentTraceDB, generate_uuid,
+            PublishedSessionDB, generate_uuid,
         )
 
         try:
@@ -455,55 +456,64 @@ class ChannelManager:
         Returns:
             (answer, output_files) tuple.
         """
-        from app.agent import SkillsAgent
+        from app.services.agent_runner import config_from_preset, create_agent, build_completed_trace
 
+        agent = None
         try:
-            agent = SkillsAgent(
-                model=preset.model_name,
-                model_provider=preset.model_provider,
-                max_turns=preset.max_turns or 60,
-                verbose=False,
-                allowed_skills=preset.skill_ids,
-                allowed_tools=preset.builtin_tools,
-                equipped_mcp_servers=preset.mcp_servers,
-                custom_system_prompt=preset.system_prompt,
-                executor_name=preset.executor_name,
-                workspace_id=session_id,
-            )
+            # Create agent via shared service
+            config = config_from_preset(preset)
+            config.verbose = False
+            agent = create_agent(config, workspace_id=session_id)
 
+            # Pre-compress if context exceeds threshold
+            if conversation_history:
+                from app.api.v1.sessions import pre_compress_if_needed
+                conversation_history = await pre_compress_if_needed(
+                    conversation_history,
+                    agent.model_provider,
+                    agent.model,
+                )
+
+            start_time = time.time()
             result = await agent.run(
                 prompt,
                 conversation_history=conversation_history,
                 image_contents=image_contents,
             )
+            duration_ms = int((time.time() - start_time) * 1000)
 
-            # Update session context
+            # Save trace (the core bug fix — channel messages now get traced)
+            from app.db.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as trace_db:
+                trace = build_completed_trace(
+                    request_text=prompt,
+                    result=result,
+                    agent=agent,
+                    duration_ms=duration_ms,
+                    executor_name=config.executor_name,
+                    session_id=session_id,
+                )
+                trace_db.add(trace)
+                await trace_db.commit()
+
+            # Update session via save_session_messages (dual-store: agent_context + display)
             if session_id and result.final_messages:
-                from app.db.database import AsyncSessionLocal
-                from app.db.models import PublishedSessionDB
-                from sqlalchemy import select
-
-                async with AsyncSessionLocal() as session:
-                    pub = await session.execute(
-                        select(PublishedSessionDB).where(PublishedSessionDB.id == session_id)
-                    )
-                    pub = pub.scalar_one_or_none()
-                    if pub:
-                        pub.agent_context = result.final_messages
-                        # Append display messages
-                        display = pub.messages or []
-                        display.append({"role": "user", "content": prompt})
-                        if result.answer:
-                            display.append({"role": "assistant", "content": result.answer})
-                        pub.messages = display
-                        pub.updated_at = datetime.utcnow()
-                        await session.commit()
+                from app.api.v1.sessions import save_session_messages
+                await save_session_messages(
+                    session_id,
+                    result.answer,
+                    prompt,
+                    final_messages=result.final_messages,
+                )
 
             return result.answer, result.output_files
 
         except Exception as e:
             logger.error(f"Agent execution failed: {e}", exc_info=True)
             return f"Error: {str(e)}", []
+        finally:
+            if agent:
+                agent.cleanup()
 
     @staticmethod
     def _build_media_context(

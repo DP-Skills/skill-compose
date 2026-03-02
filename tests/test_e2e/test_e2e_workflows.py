@@ -530,7 +530,7 @@ class TestAgentPresetLifecycleE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_06_run_agent(self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient):
         MockAgent.return_value = _make_mock_agent()
         resp = await e2e_client.post(
@@ -635,7 +635,7 @@ class TestAgentRunAndTraceE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_01_run_simple(self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient):
         MockAgent.return_value = _make_mock_agent()
         resp = await e2e_client.post(
@@ -673,7 +673,7 @@ class TestAgentRunAndTraceE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_05_run_with_skills_and_session(
         self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient
     ):
@@ -696,7 +696,7 @@ class TestAgentRunAndTraceE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_06_run_stream(
         self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -764,7 +764,7 @@ class TestFileUploadE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_03_run_agent_with_file(
         self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient
     ):
@@ -2413,7 +2413,7 @@ class TestAutoDetectOutputFilesE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_01_run_with_output_files(
         self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient
     ):
@@ -2445,7 +2445,7 @@ class TestAutoDetectOutputFilesE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_02_run_no_output_files(
         self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient
     ):
@@ -2466,7 +2466,7 @@ class TestAutoDetectOutputFilesE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_03_stream_with_output_file_events(
         self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -2544,7 +2544,7 @@ class TestAutoDetectOutputFilesE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_04_stream_no_output_files(
         self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -3407,7 +3407,7 @@ class TestResilientStreamingE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-resilient-session"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_05_agent_endpoint_turn_complete_incremental_save(
         self, MockAgent, MockSessionLocal, _mock_load, MockSave, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -3438,7 +3438,7 @@ class TestResilientStreamingE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-resilient-session"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_06_no_turn_complete_means_no_incremental_save(
         self, MockAgent, MockSessionLocal, _mock_load, MockSave, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -3624,7 +3624,7 @@ class TestAskUserE2E:
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="ask-user-session"))
     @patch("app.api.v1.agent.AsyncSessionLocal")
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_02_stream_with_ask_user_ends_run(
         self, MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, e2e_client: AsyncClient
     ):
@@ -3714,7 +3714,7 @@ class TestAskUserE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="ask-user-sync"))
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_04_non_streaming_ask_user_ends_run(self, MockAgent, _mock_load, _mock_save, e2e_client: AsyncClient):
         """In non-streaming (sync) mode, ask_user also ends the run (same as streaming)."""
         MockAgent.return_value = _make_mock_agent()
@@ -3757,7 +3757,7 @@ class TestSessionDisplayFormatE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_02_streaming_display_has_stream_events(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,
@@ -3824,7 +3824,7 @@ class TestSessionDisplayFormatE2E:
 
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_03_non_streaming_display_has_stream_events(
         self, MockAgent, MockLoadSession, MockSaveMessages,
         e2e_client: AsyncClient, e2e_db_session,
@@ -3864,7 +3864,7 @@ class TestSessionDisplayFormatE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_04_uploaded_files_stored_as_attached_files(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,
@@ -3916,7 +3916,7 @@ class TestSessionDisplayFormatE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_05_ask_user_event_in_display(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,
@@ -3966,7 +3966,7 @@ class TestSessionDisplayFormatE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_06_output_file_event_in_display(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,
@@ -4014,7 +4014,7 @@ class TestSessionDisplayFormatE2E:
     @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
     @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
     @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock)
-    @patch("app.api.v1.agent.SkillsAgent")
+    @patch("app.api.v1.agent.create_agent")
     async def test_07_display_appends_to_existing_session(
         self, MockAgent, MockLoadSession, MockSaveMessages, MockCheckpoint, MockPreCompress,
         e2e_client: AsyncClient, e2e_db_session,

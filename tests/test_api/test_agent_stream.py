@@ -1,7 +1,7 @@
 """
 Tests for Agent streaming endpoint: POST /api/v1/agent/run/stream
 
-Uses mocked SkillsAgent to avoid real LLM calls.
+Uses mocked SkillsAgent (via create_agent) to avoid real LLM calls.
 The stream endpoint uses AsyncSessionLocal directly (not get_db),
 so we also need to mock that for trace saving.
 
@@ -131,9 +131,9 @@ def _mock_session_local(db_session: AsyncSession):
 @patch("app.api.v1.agent.save_session_checkpoint", new_callable=AsyncMock)
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_returns_event_stream(MockAgent, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client):
-    MockAgent.return_value = _make_mock_agent_instance()
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_returns_event_stream(mock_create, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client):
+    mock_create.return_value = _make_mock_agent_instance()
 
     response = await client.post(
         "/api/v1/agent/run/stream",
@@ -149,9 +149,9 @@ async def test_stream_returns_event_stream(MockAgent, _mock_load, _mock_save, _m
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
 @patch("app.api.v1.agent.AsyncSessionLocal")
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_sends_run_started(MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
-    MockAgent.return_value = _make_mock_agent_instance()
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_sends_run_started(mock_create, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
+    mock_create.return_value = _make_mock_agent_instance()
     MockSessionLocal.side_effect = lambda: _mock_session_local(db_session)()
 
     response = await client.post(
@@ -174,9 +174,9 @@ async def test_stream_sends_run_started(MockAgent, MockSessionLocal, _mock_load,
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
 @patch("app.api.v1.agent.AsyncSessionLocal")
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_sends_trace_saved(MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
-    MockAgent.return_value = _make_mock_agent_instance()
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_sends_trace_saved(mock_create, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
+    mock_create.return_value = _make_mock_agent_instance()
     MockSessionLocal.side_effect = lambda: _mock_session_local(db_session)()
 
     response = await client.post(
@@ -196,9 +196,9 @@ async def test_stream_sends_trace_saved(MockAgent, MockSessionLocal, _mock_load,
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
 @patch("app.api.v1.agent.AsyncSessionLocal")
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_with_skills(MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
-    MockAgent.return_value = _make_mock_agent_instance()
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_with_skills(mock_create, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
+    mock_create.return_value = _make_mock_agent_instance()
     MockSessionLocal.side_effect = lambda: _mock_session_local(db_session)()
 
     response = await client.post(
@@ -206,9 +206,12 @@ async def test_stream_with_skills(MockAgent, MockSessionLocal, _mock_load, _mock
         json={"request": "hello", "skills": ["test-skill"], "session_id": "test-session-id"},
     )
     assert response.status_code == 200
-    MockAgent.assert_called_once()
-    call_kwargs = MockAgent.call_args
-    assert call_kwargs[1].get("allowed_skills") == ["test-skill"]
+    # create_agent is called twice in stream (once for initial trace config read, once for actual agent)
+    # The actual agent creation uses a stream_config with verbose=False
+    assert mock_create.call_count >= 1
+    # Check the config passed to create_agent has the correct skills
+    config = mock_create.call_args[0][0]
+    assert config.skills == ["test-skill"]
 
 
 @pytest.mark.asyncio
@@ -217,9 +220,9 @@ async def test_stream_with_skills(MockAgent, MockSessionLocal, _mock_load, _mock
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
 @patch("app.api.v1.agent.AsyncSessionLocal")
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_with_mcp_servers(MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
-    MockAgent.return_value = _make_mock_agent_instance()
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_with_mcp_servers(mock_create, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
+    mock_create.return_value = _make_mock_agent_instance()
     MockSessionLocal.side_effect = lambda: _mock_session_local(db_session)()
 
     response = await client.post(
@@ -227,9 +230,9 @@ async def test_stream_with_mcp_servers(MockAgent, MockSessionLocal, _mock_load, 
         json={"request": "hello", "equipped_mcp_servers": ["fetch"], "session_id": "test-session-id"},
     )
     assert response.status_code == 200
-    MockAgent.assert_called_once()
-    call_kwargs = MockAgent.call_args
-    assert call_kwargs[1].get("equipped_mcp_servers") == ["fetch"]
+    assert mock_create.call_count >= 1
+    config = mock_create.call_args[0][0]
+    assert config.equipped_mcp_servers == ["fetch"]
 
 
 @pytest.mark.asyncio
@@ -238,8 +241,8 @@ async def test_stream_with_mcp_servers(MockAgent, MockSessionLocal, _mock_load, 
 @patch("app.api.v1.agent.save_session_messages", new_callable=AsyncMock)
 @patch("app.api.v1.agent.load_or_create_session", new_callable=AsyncMock, return_value=SessionData(session_id="test-session-id"))
 @patch("app.api.v1.agent.AsyncSessionLocal")
-@patch("app.api.v1.agent.SkillsAgent")
-async def test_stream_error_handling(MockAgent, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
+@patch("app.api.v1.agent.create_agent")
+async def test_stream_error_handling(mock_create, MockSessionLocal, _mock_load, _mock_save, _mock_checkpoint, _mock_precompress, client, db_session):
     """When agent encounters error, it pushes error complete event and stream includes it."""
     # In the async architecture, agent.run() catches errors internally
     # and pushes a complete event with success=False
@@ -261,7 +264,7 @@ async def test_stream_error_handling(MockAgent, MockSessionLocal, _mock_load, _m
             },
         ),
     ]
-    MockAgent.return_value = _make_mock_agent_instance(events=error_events)
+    mock_create.return_value = _make_mock_agent_instance(events=error_events)
     MockSessionLocal.side_effect = lambda: _mock_session_local(db_session)()
 
     response = await client.post(

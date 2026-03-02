@@ -74,6 +74,7 @@ def create_agent(config: AgentConfig, workspace_id: Optional[str] = None) -> Ski
         executor_name=config.executor_name,
         workspace_id=workspace_id,
         is_meta_agent=config.is_meta_agent,
+        agent_id=config.agent_id,
     )
 
 

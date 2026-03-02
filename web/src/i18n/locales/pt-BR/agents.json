@@ -26,7 +26,8 @@
   "detail": {
     "tabs": {
       "overview": "Visão Geral",
-      "configuration": "Configuração"
+      "configuration": "Configuração",
+      "memory": "Memória"
     },
     "overview": "Visão Geral",
     "configuration": "Configuração",
@@ -201,6 +202,32 @@
     "name": "Nome do Modelo",
     "selectProvider": "Selecionar provedor",
     "selectModel": "Selecionar modelo"
+  },
+  "memory": {
+    "bootstrapFiles": "Arquivos de Inicialização",
+    "bootstrapDescription": "Instruções de nível de sistema injetadas no contexto do agente. Arquivos por agente substituem os globais.",
+    "scope": "Escopo",
+    "scopeGlobal": "Global",
+    "scopeAgent": "Por Agente",
+    "editorPlaceholder": "Escreva o conteúdo de {{filename}} aqui...",
+    "fileSaved": "Arquivo salvo",
+    "fileSaveError": "Falha ao salvar arquivo",
+    "fileDeleted": "Arquivo excluído",
+    "fileDeleteError": "Falha ao excluir arquivo",
+    "entries": "Entradas de Memória",
+    "addEntry": "Adicionar Entrada",
+    "addEntryDescription": "Salvar uma nova entrada de memória para este agente",
+    "entryContentPlaceholder": "Digite a informação a ser lembrada...",
+    "category": "Categoria",
+    "entrySaved": "Entrada de memória salva",
+    "entrySaveError": "Falha ao salvar entrada",
+    "entryDeleted": "Entrada de memória excluída",
+    "entryDeleteError": "Falha ao excluir entrada",
+    "deleteEntry": "Excluir Entrada",
+    "deleteEntryConfirm": "Tem certeza de que deseja excluir esta entrada de memória?",
+    "searchPlaceholder": "Pesquisar memórias...",
+    "noSearchResults": "Nenhuma memória correspondente encontrada",
+    "noEntries": "Ainda não há entradas de memória. Adicione entradas manualmente ou deixe o agente salvá-las durante as conversas."
   },
   "seedDescriptions": {
     "agent-builder": "Constrói agentes personalizados com base nos requisitos do usuário. Analisa necessidades, planeja habilidades necessárias, cria novas se preciso e gera configurações de preset.",

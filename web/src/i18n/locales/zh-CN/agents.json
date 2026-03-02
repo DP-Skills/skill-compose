@@ -26,7 +26,8 @@
   "detail": {
     "tabs": {
       "overview": "概览",
-      "configuration": "配置"
+      "configuration": "配置",
+      "memory": "记忆"
     },
     "overview": "概览",
     "configuration": "配置",
@@ -201,6 +202,32 @@
     "name": "模型名称",
     "selectProvider": "选择提供商",
     "selectModel": "选择模型"
+  },
+  "memory": {
+    "bootstrapFiles": "引导文件",
+    "bootstrapDescription": "注入到智能体上下文的系统级指令。每个智能体的文件会覆盖全局文件。",
+    "scope": "范围",
+    "scopeGlobal": "全局",
+    "scopeAgent": "按智能体",
+    "editorPlaceholder": "在此编写 {{filename}} 内容...",
+    "fileSaved": "文件已保存",
+    "fileSaveError": "保存文件失败",
+    "fileDeleted": "文件已删除",
+    "fileDeleteError": "删除文件失败",
+    "entries": "记忆条目",
+    "addEntry": "添加条目",
+    "addEntryDescription": "为此智能体保存新的记忆条目",
+    "entryContentPlaceholder": "输入要记住的信息...",
+    "category": "类别",
+    "entrySaved": "记忆条目已保存",
+    "entrySaveError": "保存条目失败",
+    "entryDeleted": "记忆条目已删除",
+    "entryDeleteError": "删除条目失败",
+    "deleteEntry": "删除条目",
+    "deleteEntryConfirm": "确定要删除此记忆条目吗？",
+    "searchPlaceholder": "搜索记忆...",
+    "noSearchResults": "未找到匹配的记忆",
+    "noEntries": "暂无记忆条目。可手动添加条目，或让智能体在对话中自动保存。"
   },
   "seedDescriptions": {
     "agent-builder": "根据用户需求构建自定义智能体。分析需求、规划所需技能、按需创建新技能，并生成智能体预设配置。",

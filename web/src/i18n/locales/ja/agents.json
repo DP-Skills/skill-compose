@@ -26,7 +26,8 @@
   "detail": {
     "tabs": {
       "overview": "概要",
-      "configuration": "設定"
+      "configuration": "設定",
+      "memory": "メモリ"
     },
     "overview": "概要",
     "configuration": "設定",
@@ -201,6 +202,32 @@
     "name": "モデル名",
     "selectProvider": "プロバイダーを選択",
     "selectModel": "モデルを選択"
+  },
+  "memory": {
+    "bootstrapFiles": "ブートストラップファイル",
+    "bootstrapDescription": "エージェントのコンテキストに注入されるシステムレベルの指示。エージェント固有のファイルはグローバルファイルを上書きします。",
+    "scope": "スコープ",
+    "scopeGlobal": "グローバル",
+    "scopeAgent": "エージェント固有",
+    "editorPlaceholder": "{{filename}} の内容をここに記入...",
+    "fileSaved": "ファイルを保存しました",
+    "fileSaveError": "ファイルの保存に失敗しました",
+    "fileDeleted": "ファイルを削除しました",
+    "fileDeleteError": "ファイルの削除に失敗しました",
+    "entries": "メモリエントリ",
+    "addEntry": "エントリを追加",
+    "addEntryDescription": "このエージェントの新しいメモリエントリを保存",
+    "entryContentPlaceholder": "記憶する情報を入力...",
+    "category": "カテゴリ",
+    "entrySaved": "メモリエントリを保存しました",
+    "entrySaveError": "エントリの保存に失敗しました",
+    "entryDeleted": "メモリエントリを削除しました",
+    "entryDeleteError": "エントリの削除に失敗しました",
+    "deleteEntry": "エントリを削除",
+    "deleteEntryConfirm": "このメモリエントリを削除してもよろしいですか？",
+    "searchPlaceholder": "メモリを検索...",
+    "noSearchResults": "一致するメモリが見つかりません",
+    "noEntries": "メモリエントリはまだありません。手動で追加するか、会話中にエージェントが自動保存します。"
   },
   "seedDescriptions": {
     "agent-builder": "ユーザーの要件に基づいてカスタムエージェントを構築。ニーズを分析し、必要なスキルを計画、新しいスキルを作成し、エージェントプリセット設定を生成します。",

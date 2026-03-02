@@ -26,7 +26,8 @@
   "detail": {
     "tabs": {
       "overview": "Overview",
-      "configuration": "Configuration"
+      "configuration": "Configuration",
+      "memory": "Memory"
     },
     "overview": "Overview",
     "configuration": "Configuration",
@@ -201,6 +202,32 @@
     "name": "Model Name",
     "selectProvider": "Select provider",
     "selectModel": "Select model"
+  },
+  "memory": {
+    "bootstrapFiles": "Bootstrap Files",
+    "bootstrapDescription": "System-level instructions injected into the agent's context. Per-agent files override global ones.",
+    "scope": "Scope",
+    "scopeGlobal": "Global",
+    "scopeAgent": "Per-Agent",
+    "editorPlaceholder": "Write {{filename}} content here...",
+    "fileSaved": "File saved",
+    "fileSaveError": "Failed to save file",
+    "fileDeleted": "File deleted",
+    "fileDeleteError": "Failed to delete file",
+    "entries": "Memory Entries",
+    "addEntry": "Add Entry",
+    "addEntryDescription": "Save a new memory entry for this agent",
+    "entryContentPlaceholder": "Enter the information to remember...",
+    "category": "Category",
+    "entrySaved": "Memory entry saved",
+    "entrySaveError": "Failed to save entry",
+    "entryDeleted": "Memory entry deleted",
+    "entryDeleteError": "Failed to delete entry",
+    "deleteEntry": "Delete Entry",
+    "deleteEntryConfirm": "Are you sure you want to delete this memory entry?",
+    "searchPlaceholder": "Search memories...",
+    "noSearchResults": "No matching memories found",
+    "noEntries": "No memory entries yet. Add entries manually or let the agent save them during conversations."
   },
   "seedDescriptions": {
     "agent-builder": "Build custom agents based on user requirements. Analyzes needs, plans required skills, creates new skills if needed, and generates Agent Preset configurations.",

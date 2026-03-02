@@ -27,7 +27,7 @@ services:
   # Database Service - PostgreSQL
   # ============================================================================
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: skills-db
     restart: unless-stopped
     environment:
@@ -80,6 +80,13 @@ services:
       - UPLOADS_DIR=/app/uploads
       - CONFIG_DIR=/app/config
       - BACKUPS_DIR=/app/backups
+      # Memory / Embedding
+      - MEMORY_DIR=/app/memory
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-1536}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
     volumes:
       - skills:/app/skills
       - logs:/app/logs
@@ -87,6 +94,7 @@ services:
       - config:/app/config
       - backups:/app/backups
       - workspaces:/app/workspaces
+      - memory:/app/memory
       - ./.env:/app/.env.seed:ro
     ports:
       - "${API_PORT:-62610}:62610"
@@ -376,4 +384,6 @@ volumes:
   uploads:
     driver: local
   backups:
+    driver: local
+  memory:
     driver: local

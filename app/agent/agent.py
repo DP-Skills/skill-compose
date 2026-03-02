@@ -622,6 +622,7 @@ class SkillsAgent:
         executor_name: Optional[str] = None,
         workspace_id: Optional[str] = None,
         is_meta_agent: bool = False,
+        agent_id: Optional[str] = None,
     ):
         # Model configuration
         self.model_provider = model_provider or settings.default_model_provider
@@ -633,6 +634,8 @@ class SkillsAgent:
         self.allowed_tools = allowed_tools  # None means all tools are available
         self.equipped_mcp_servers = equipped_mcp_servers  # None means default MCP servers
         self.executor_name = executor_name  # Remote executor for code execution
+        self.agent_id = agent_id  # Agent preset ID for memory scope
+        self._background_tasks: set = set()  # prevent GC of fire-and-forget tasks
 
         # Initialize LLM client with provider-specific configuration
         self.client = LLMClient(
@@ -649,6 +652,7 @@ class SkillsAgent:
             executor_name=executor_name,
             workspace_id=workspace_id,
             is_meta_agent=is_meta_agent,
+            agent_id=agent_id,
         )
 
         # Filter tools if allowed_tools is specified
@@ -693,8 +697,29 @@ class SkillsAgent:
             skills_dir=_SKILLS_DIR,
         )
 
+        # Append memory bootstrap files to system prompt
+        memory_section = self._build_memory_section()
+        if memory_section:
+            self.system_prompt += memory_section
+
         # Ensure log directory exists
         os.makedirs(log_dir, exist_ok=True)
+
+    def _build_memory_section(self) -> str:
+        """Build the memory section for system prompt from bootstrap files."""
+        try:
+            from app.services.memory_service import load_bootstrap_files
+            files = load_bootstrap_files(self.agent_id)
+            if not files:
+                return ""
+            parts = ["\n\n## Agent Memory"]
+            for filename, content in files.items():
+                parts.append(f"\n### {filename}\n{content}")
+            return "\n".join(parts)
+        except Exception as e:
+            if self.verbose:
+                print(f"[Memory] Failed to load bootstrap files: {e}")
+            return ""
 
     def _build_equipped_skills_section(self) -> str:
         """Build the equipped skills section for system prompt."""
@@ -1113,6 +1138,27 @@ class SkillsAgent:
 
             # Context compression check
             if last_input_tokens > 0 and self._should_compress(last_input_tokens):
+                # Flush memory before compression (fire-and-forget on a deep-copied snapshot,
+                # so compression can safely mutate/replace `messages` concurrently)
+                if self.agent_id:
+                    try:
+                        from app.services.memory_service import flush_memory
+                        snapshot = copy.deepcopy(messages[-20:])
+                        task = asyncio.create_task(flush_memory(
+                            snapshot, self.agent_id,
+                            self.model_provider, self.model,
+                        ))
+                        self._background_tasks.add(task)
+                        def _on_flush_done(t, _tasks=self._background_tasks):
+                            _tasks.discard(t)
+                            if not t.cancelled():
+                                exc = t.exception()
+                                if exc and self.verbose:
+                                    print(f"\n[Memory Flush] Background error: {exc}")
+                        task.add_done_callback(_on_flush_done)
+                    except Exception as flush_err:
+                        if self.verbose:
+                            print(f"\n[Memory Flush] Failed (non-fatal): {flush_err}")
                 if self.verbose:
                     print(f"\n[Context Compression] Input tokens ({last_input_tokens}) exceeded threshold, compressing...")
                 messages, s_in, s_out = await self._compress_messages(messages)

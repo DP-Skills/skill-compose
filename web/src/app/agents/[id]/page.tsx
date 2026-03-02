@@ -30,6 +30,7 @@ import { useChatPanel } from '@/components/chat/chat-provider';
 import { AgentConfigForm, type AgentFormValues } from '@/components/agents/agent-config-form';
 import { PublishCard } from '@/components/agents/publish-card';
 import { PublishDialog } from '@/components/agents/publish-dialog';
+import { AgentMemoryTab } from '@/components/agents/agent-memory-tab';
 
 export default function AgentDetailPage() {
   const router = useRouter();
@@ -272,9 +273,10 @@ export default function AgentDetailPage() {
 
       {/* Tabs */}
       <Tabs value={initialTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="overview">{t('detail.tabs.overview')}</TabsTrigger>
           <TabsTrigger value="configuration">{t('detail.tabs.configuration')}</TabsTrigger>
+          <TabsTrigger value="memory">{t('detail.tabs.memory')}</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -370,6 +372,11 @@ export default function AgentDetailPage() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Memory Tab */}
+        <TabsContent value="memory">
+          <AgentMemoryTab agentId={presetId} />
         </TabsContent>
       </Tabs>
 

@@ -80,6 +80,16 @@ class Settings(BaseSettings):
     feishu_app_secret: str = ""
     telegram_bot_token: str = ""
 
+    # Embedding (for memory vector search)
+    embedding_provider: str = "openai"  # EMBEDDING_PROVIDER
+    embedding_model: str = "text-embedding-3-small"  # EMBEDDING_MODEL
+    embedding_dimensions: int = 1536  # EMBEDDING_DIMENSIONS
+    embedding_api_key: str = ""  # EMBEDDING_API_KEY (fallback: OPENAI_API_KEY)
+    embedding_base_url: str = ""  # EMBEDDING_BASE_URL (custom endpoints)
+
+    # Memory
+    memory_dir: str = "./memory"  # MEMORY_DIR
+
     # Meta skills (internal use only, not selectable by users)
     meta_skills: list[str] = ["skill-creator", "skill-updater", "skill-evolver", "skill-finder", "trace-qa", "skills-planner", "planning-with-files", "mcp-builder"]
 

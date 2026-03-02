@@ -1572,12 +1572,87 @@ def _create_mcp_tool_function(server_name: str, tool_name: str) -> Callable:
     return mcp_tool_func
 
 
+# ─── Memory Tools ────────────────────────────────────────────────
+
+MEMORY_TOOLS = [
+    {
+        "name": "memory_search",
+        "description": "Search the agent's memory for relevant information using semantic similarity. Use this to recall previously saved facts, preferences, procedures, and context.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query to find relevant memories"
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (default: 5)",
+                    "default": 5
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "memory_save",
+        "description": "Save important information to the agent's long-term memory. Use this to remember facts, user preferences, procedures, or important context for future conversations.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The information to save (1-3 concise sentences)"
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Category of the memory entry",
+                    "enum": ["fact", "preference", "procedure", "context"]
+                }
+            },
+            "required": ["content"]
+        }
+    },
+]
+
+
+def create_memory_tool_functions(agent_id: Optional[str] = None) -> Dict[str, Callable]:
+    """Create bound memory tool functions for a specific agent."""
+    from app.services.memory_service import search_memory_sync, save_memory_sync
+
+    def memory_search(query: str, top_k: int = 5, **kwargs) -> Dict[str, Any]:
+        results = search_memory_sync(query, agent_id=agent_id, top_k=top_k)
+        if not results:
+            return {"results": [], "message": "No matching memories found."}
+        return {"results": results}
+
+    def memory_save(content: str, category: str = "context", **kwargs) -> Dict[str, Any]:
+        valid_categories = {"fact", "preference", "procedure", "context", "session_summary"}
+        if category not in valid_categories:
+            category = "context"
+        if len(content) > 4096:
+            content = content[:4096]
+        entry = save_memory_sync(
+            content=content,
+            agent_id=agent_id,
+            category=category,
+            source="agent_tool",
+        )
+        return {"saved": True, "id": entry["id"], "content": content, "category": category}
+
+    return {
+        "memory_search": memory_search,
+        "memory_save": memory_save,
+    }
+
+
 def get_tools_for_agent(
     equipped_mcp_servers: Optional[List[str]] = None,
     skill_names: Optional[List[str]] = None,
     executor_name: Optional[str] = None,
     workspace_id: Optional[str] = None,
     is_meta_agent: bool = False,
+    agent_id: Optional[str] = None,
 ) -> tuple[List[Dict[str, Any]], Dict[str, Callable], AgentWorkspace]:
     """
     Get tools, tool functions, and workspace for an agent.
@@ -1595,6 +1670,7 @@ def get_tools_for_agent(
                        the specified executor container instead of locally.
         is_meta_agent: If True, include meta tools (e.g. list_registry_skills)
                        that are only available to system/meta agents.
+        agent_id: Optional agent preset ID for memory tools scope.
 
     Returns:
         Tuple of (tools list for Claude, tool_functions dict, workspace)
@@ -1624,6 +1700,11 @@ def get_tools_for_agent(
     if is_meta_agent:
         tools.extend(META_TOOLS)
         tool_functions.update(META_TOOL_FUNCTIONS)
+
+    # Add memory tools when agent_id is provided
+    if agent_id:
+        tools.extend(MEMORY_TOOLS)
+        tool_functions.update(create_memory_tool_functions(agent_id))
 
     # Get MCP client
     mcp_client = get_mcp_client()
@@ -1668,6 +1749,8 @@ TOOL_REQUIRED_PARAMS: Dict[str, List[str]] = {
     "web_fetch": ["url", "prompt"],
     "web_search": ["query"],
     "ask_user": ["question"],
+    "memory_search": ["query"],
+    "memory_save": ["content"],
 }
 
 

@@ -130,8 +130,8 @@ async def _run_migrations():
     from sqlalchemy import text
 
     async with engine.begin() as conn:
-        # Remove unused pgvector extension (migrated to plain postgres:16)
-        await conn.execute(text("DROP EXTENSION IF EXISTS vector"))
+        # Enable pgvector extension for memory vector search
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
         # Safely add columns using DO blocks (ignores duplicate_column errors)
         await conn.execute(text("""
@@ -408,6 +408,54 @@ async def _run_migrations():
             ON channel_bindings (channel_type, (config->>'app_id'))
             WHERE external_id = '*'
         """))
+
+    # Create memory_entries table with pgvector embedding column
+    from app.config import get_settings as _get_settings
+    _dim = _get_settings().embedding_dimensions
+    if not (isinstance(_dim, int) and 0 < _dim <= 4096):
+        raise ValueError(f"Invalid embedding dimension: {_dim}")
+    async with engine.begin() as conn:
+        await conn.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS memory_entries (
+                id VARCHAR(36) PRIMARY KEY,
+                agent_id VARCHAR(36),
+                content TEXT NOT NULL,
+                category VARCHAR(64),
+                source VARCHAR(256),
+                embedding vector({_dim}),
+                embedding_model VARCHAR(128),
+                session_id VARCHAR(36),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_memory_entries_agent_id ON memory_entries (agent_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_memory_entries_category ON memory_entries (category)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_memory_entries_created_at ON memory_entries (created_at)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_memory_entries_embedding ON memory_entries USING hnsw (embedding vector_cosine_ops)"))
+
+    # Add embedding column to memory_entries if missing (for existing DBs before pgvector)
+    async with engine.begin() as conn:
+        await conn.execute(text(f"""
+            DO $$ BEGIN
+                ALTER TABLE memory_entries ADD COLUMN embedding vector({_dim});
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$
+        """))
+
+    # Warn if configured dimension differs from existing column
+    async with engine.begin() as conn:
+        result = await conn.execute(text("""
+            SELECT atttypmod FROM pg_attribute
+            WHERE attrelid = 'memory_entries'::regclass AND attname = 'embedding' AND atttypmod > 0
+        """))
+        row = result.fetchone()
+        if row and row[0] != _dim:
+            logger.warning(
+                f"EMBEDDING_DIMENSIONS={_dim} but existing embedding column has dimension {row[0]}. "
+                "To change dimensions, DROP the embedding column and re-embed all entries: "
+                "ALTER TABLE memory_entries DROP COLUMN embedding; then restart."
+            )
 
     # Ensure meta skills from filesystem are registered in the database
     await _ensure_meta_skills_registered()

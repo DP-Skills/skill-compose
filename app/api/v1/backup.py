@@ -100,6 +100,7 @@ class BackupStats(BaseModel):
     agents: int = 0
     traces: int = 0
     sessions: int = 0
+    memory_entries: int = 0
 
 
 class BackupListItem(BaseModel):
@@ -135,6 +136,7 @@ async def _get_db_stats() -> BackupStats:
             ("agents", "agent_presets"),
             ("traces", "agent_traces"),
             ("sessions", "published_sessions"),
+            ("memory_entries", "memory_entries"),
         ]:
             try:
                 result = await db.execute(text(f"SELECT COUNT(*) FROM {table}"))
@@ -408,7 +410,7 @@ async def _restore_from_zip(zip_bytes: bytes) -> RestoreResponse:
 
     return RestoreResponse(
         success=True,
-        message=f"Restore completed. Restored {restored_stats.skills} skills, {restored_stats.agents} agents, {restored_stats.traces} traces.",
+        message=f"Restore completed. Restored {restored_stats.skills} skills, {restored_stats.agents} agents, {restored_stats.traces} traces, {restored_stats.memory_entries} memory entries.",
         snapshot_filename=snapshot_filename,
         restored=restored_stats,
         errors=errors,

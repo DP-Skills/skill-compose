@@ -7,10 +7,11 @@ Tables:
 - skill_files: Files associated with a version (resources, scripts)
 - skill_tests: Test cases for regression testing
 - skill_changelogs: Audit trail for changes
+- memory_entries: Vector-searchable memory entries for agents
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from sqlalchemy import (
@@ -26,6 +27,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    Vector = None  # pgvector not installed — embedding column omitted from ORM
 
 from app.db.database import Base
 
@@ -841,3 +847,76 @@ class SkillChangelogDB(Base):
 
     def __repr__(self) -> str:
         return f"<SkillChangelog(skill_id={self.skill_id}, type={self.change_type})>"
+
+
+class MemoryEntryDB(Base):
+    """
+    Vector-searchable memory entries for agents.
+
+    Stores facts, preferences, procedures, and context that agents can
+    recall via semantic search. Supports global (agent_id=NULL) and
+    per-agent scopes.
+
+    Note: The `embedding` column uses pgvector's Vector type and is created
+    via raw SQL migration in database.py (dimension controlled by
+    EMBEDDING_DIMENSIONS config). The ORM column is defined when pgvector
+    is installed; otherwise it is omitted (raw SQL still works).
+    """
+    __tablename__ = "memory_entries"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=generate_uuid
+    )
+    agent_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True
+    )  # NULL = global memory
+    content: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )
+    category: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )  # fact / preference / procedure / context / session_summary
+    source: Mapped[Optional[str]] = mapped_column(
+        String(256), nullable=True
+    )  # manual / auto_flush / agent_tool / session_end
+    embedding_model: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True
+    )
+    session_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_memory_entries_agent_id", "agent_id"),
+        Index("ix_memory_entries_category", "category"),
+        Index("ix_memory_entries_created_at", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<MemoryEntry(id={self.id}, agent_id={self.agent_id}, category={self.category})>"
+
+
+# Embedding column for MemoryEntryDB — added via Column to the underlying Table
+# because the Vector type requires pgvector to be installed. When pgvector is absent,
+# the column is omitted from the ORM but still exists in the DB (created by raw SQL
+# migration in database.py). All embedding operations use raw SQL, so this is safe.
+#
+# The dimension reads from EMBEDDING_DIMENSIONS at import time. If the setting is
+# unavailable (e.g. in tests without env), the default 1536 from BaseSettings applies.
+if Vector is not None:
+    from sqlalchemy import Column
+    try:
+        from app.config import get_settings as _get_settings
+        _embedding_dim = _get_settings().embedding_dimensions
+    except Exception:
+        _embedding_dim = 1536
+    MemoryEntryDB.__table__.append_column(
+        Column("embedding", Vector(_embedding_dim), nullable=True)
+    )

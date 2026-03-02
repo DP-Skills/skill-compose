@@ -26,7 +26,8 @@
   "detail": {
     "tabs": {
       "overview": "Resumen",
-      "configuration": "Configuración"
+      "configuration": "Configuración",
+      "memory": "Memoria"
     },
     "overview": "Resumen",
     "configuration": "Configuración",
@@ -201,6 +202,32 @@
     "name": "Nombre del Modelo",
     "selectProvider": "Seleccionar proveedor",
     "selectModel": "Seleccionar modelo"
+  },
+  "memory": {
+    "bootstrapFiles": "Archivos de Arranque",
+    "bootstrapDescription": "Instrucciones a nivel de sistema inyectadas en el contexto del agente. Los archivos por agente anulan los globales.",
+    "scope": "Alcance",
+    "scopeGlobal": "Global",
+    "scopeAgent": "Por Agente",
+    "editorPlaceholder": "Escribe el contenido de {{filename}} aquí...",
+    "fileSaved": "Archivo guardado",
+    "fileSaveError": "Error al guardar el archivo",
+    "fileDeleted": "Archivo eliminado",
+    "fileDeleteError": "Error al eliminar el archivo",
+    "entries": "Entradas de Memoria",
+    "addEntry": "Agregar Entrada",
+    "addEntryDescription": "Guardar una nueva entrada de memoria para este agente",
+    "entryContentPlaceholder": "Ingresa la información a recordar...",
+    "category": "Categoría",
+    "entrySaved": "Entrada de memoria guardada",
+    "entrySaveError": "Error al guardar la entrada",
+    "entryDeleted": "Entrada de memoria eliminada",
+    "entryDeleteError": "Error al eliminar la entrada",
+    "deleteEntry": "Eliminar Entrada",
+    "deleteEntryConfirm": "¿Estás seguro de que deseas eliminar esta entrada de memoria?",
+    "searchPlaceholder": "Buscar memorias...",
+    "noSearchResults": "No se encontraron memorias coincidentes",
+    "noEntries": "Aún no hay entradas de memoria. Agrega entradas manualmente o deja que el agente las guarde durante las conversaciones."
   },
   "seedDescriptions": {
     "agent-builder": "Construye agentes personalizados según los requisitos del usuario. Analiza necesidades, planifica habilidades requeridas, crea nuevas si es necesario y genera configuraciones de presets.",

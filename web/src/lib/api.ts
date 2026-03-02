@@ -2387,3 +2387,175 @@ export const scheduledTasksApi = {
     return response.json();
   },
 };
+
+
+// ========================================================================
+// Memory API
+// ========================================================================
+
+export interface BootstrapFileInfo {
+  filename: string;
+  global_exists: boolean;
+  agent_exists: boolean;
+  effective_scope: string | null;
+  size: number;
+}
+
+export interface MemoryEntry {
+  id: string;
+  agent_id: string | null;
+  content: string;
+  category: string | null;
+  source: string | null;
+  embedding_model: string | null;
+  session_id: string | null;
+  created_at: string;
+  updated_at: string;
+  similarity?: number | null;
+}
+
+export interface MemorySearchResult {
+  id: string;
+  agent_id: string | null;
+  content: string;
+  category: string | null;
+  source: string | null;
+  created_at: string;
+  similarity: number | null;
+}
+
+export const memoryApi = {
+  // Bootstrap files
+  listFiles: async (agentId?: string): Promise<{ files: BootstrapFileInfo[] }> => {
+    const params = agentId ? `?agent_id=${encodeURIComponent(agentId)}` : '';
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/files${params}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to list files');
+    }
+    return response.json();
+  },
+
+  readFile: async (scope: string, filename: string): Promise<{ content: string; scope: string; filename: string }> => {
+    const response = await authedFetch(
+      `${BACKEND_API_BASE}/memory/files/${encodeURIComponent(scope)}/${encodeURIComponent(filename)}`
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to read file');
+    }
+    return response.json();
+  },
+
+  writeFile: async (scope: string, filename: string, content: string): Promise<{ success: boolean }> => {
+    const response = await authedFetch(
+      `${BACKEND_API_BASE}/memory/files/${encodeURIComponent(scope)}/${encodeURIComponent(filename)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to write file');
+    }
+    return response.json();
+  },
+
+  deleteFile: async (scope: string, filename: string): Promise<{ success: boolean }> => {
+    const response = await authedFetch(
+      `${BACKEND_API_BASE}/memory/files/${encodeURIComponent(scope)}/${encodeURIComponent(filename)}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to delete file');
+    }
+    return response.json();
+  },
+
+  // Memory entries
+  listEntries: async (params?: {
+    agent_id?: string;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entries: MemoryEntry[]; total: number }> => {
+    const searchParams = new URLSearchParams();
+    if (params?.agent_id) searchParams.set('agent_id', params.agent_id);
+    if (params?.category) searchParams.set('category', params.category);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    const query = searchParams.toString();
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/entries${query ? `?${query}` : ''}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to list entries');
+    }
+    return response.json();
+  },
+
+  createEntry: async (data: {
+    content: string;
+    agent_id?: string;
+    category?: string;
+    source?: string;
+  }): Promise<MemoryEntry> => {
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to create entry');
+    }
+    return response.json();
+  },
+
+  updateEntry: async (id: string, data: {
+    content?: string;
+    category?: string;
+  }): Promise<MemoryEntry> => {
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/entries/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to update entry');
+    }
+    return response.json();
+  },
+
+  deleteEntry: async (id: string): Promise<{ success: boolean }> => {
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/entries/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to delete entry');
+    }
+    return response.json();
+  },
+
+  // Search
+  search: async (data: {
+    query: string;
+    agent_id?: string;
+    top_k?: number;
+  }): Promise<{ results: MemorySearchResult[]; query: string }> => {
+    const response = await authedFetch(`${BACKEND_API_BASE}/memory/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(response.status, error.detail || 'Failed to search memory');
+    }
+    return response.json();
+  },
+};
